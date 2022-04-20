@@ -1,6 +1,8 @@
 import logo from './logo.svg';
 import './App.css';
 import React, { useRef, useEffect } from 'react';
+import Slider from '@mui/material/Slider';
+import Typography from '@mui/material/Typography';
 
 function App() {
   const canvas = useRef();
@@ -80,21 +82,18 @@ function App() {
 
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-        <canvas ref={canvas}></canvas>
-      </header>
+      <div className='split-panel'>
+        <div className='menu-panel'>
+          <Typography id="input-points-count" gutterBottom>
+            Liczba punktów
+          </Typography>
+          <Slider defaultValue={10} min={5} max={25} valueLabelDisplay="on" aria-labelledby='input-points-count'/>
+        </div>
+
+        <div className='canvas-panel'>
+          <canvas ref={canvas}></canvas>
+        </div>
+      </div>
     </div>
   );
 }
