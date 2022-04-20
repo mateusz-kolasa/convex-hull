@@ -17,19 +17,26 @@ function App() {
     context = canvasElement.getContext("2d");
 
     var points = []
-    for (var i = 0; i <= 15; i++) {
+    for (let i = 0; i <= 15; i++) {
       var rand = getRandomPoint();
-      points.push(rand)
+      points.push(rand);
       drawCircle({ x: rand.x, y: rand.y });
     }
 
     points.sort((a, b) => getAngle(a) - getAngle(b));
-    for (var i = 0; i < points.length - 1; i++) {
-      drawLine({ x: points[i].x, y: points[i].y, x1: points[i+1].x, y1: points[i+1].y }, { color: 'blue' });
-    }
-    drawLine({ x: points[points.length-1].x, y: points[points.length-1].y, x1: points[0].x, y1: points[0].y }, { color: 'blue' });
+    drawPolygon(points, 'blue')
 
-    drawCircle({ x: canvasElement.width / 2, y: canvasElement.height / 2 }, { color: 'red', size: 5 })
+    drawCircle({ x: canvasElement.width / 2, y: canvasElement.height / 2 }, { color: 'red', size: 5 });
+
+    var ch = require('convex-hull');
+    var hullIndexes = ch(points.map(point => [point.x, point.y]));
+
+    var hull = [];
+    for (let i = 0; i < hullIndexes.length; i++) {
+      hull.push(points[hullIndexes[i][0]]);
+    }
+
+    drawPolygon(hull, 'green');
   }, []);
 
   const drawLine = (info, style = {}) => {
@@ -54,11 +61,18 @@ function App() {
     context.fill();
   };
 
-  function getAngle(point) {
+  const drawPolygon = (points, color) => {
+    for (let i = 0; i < points.length - 1; i++) {
+      drawLine({ x: points[i].x, y: points[i].y, x1: points[i+1].x, y1: points[i+1].y }, { color: color });
+    }
+    drawLine({ x: points[points.length-1].x, y: points[points.length-1].y, x1: points[0].x, y1: points[0].y }, { color: color });
+  }
+
+  const getAngle = (point) => {
     return Math.atan2(canvas.current.height / 2 - point.y, canvas.current.width / 2 - point.x);
   }
 
-  function getRandomPoint () {
+  const getRandomPoint = () => {
     var x = Math.random() * canvas.current.width;
     var y = Math.random() * canvas.current.height;
     return { x: x, y: y };
