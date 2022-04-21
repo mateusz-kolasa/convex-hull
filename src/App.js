@@ -13,6 +13,12 @@ function App() {
   var pointCount = 10;
   var displayPolygon = true;
   var displayConvexHull = true;
+  var displayBezier = true;
+
+  var bezierSize = 0.1;
+  var elipsePoints = 100;
+  const bezierPointsRef = useRef([]);
+  const elipsePointsRef = useRef([]);
 
   const points = useRef([]);
   const hullRef = useRef([]);
@@ -54,6 +60,7 @@ function App() {
       hullRef.current.push(points.current[hullIndexes[i][0]]);
     }
 
+    generateBezier();
     redraw();
   }
 
@@ -87,6 +94,104 @@ function App() {
         drawPolygon(rectangle, 'red');
       }
     }
+
+
+    if (displayBezier) {
+      let bezierPoints = bezierPointsRef.current;
+      for (let i = 0; i < bezierPoints.length; i++) {
+        drawCircle(bezierPoints[i].p1, {color: 'red', size: 3});
+        drawCircle(bezierPoints[i].p2, {color: 'red', size: 3});
+      }
+
+      let elipsePoints = elipsePointsRef.current;
+
+      for (let i = 0; i < elipsePoints.length; i++) {
+        drawPolygon(elipsePoints[i], 'gray');
+      }
+    }
+  }
+
+  // Generate bezier elipses for convex hull
+  const generateBezier = () => {
+    let hull = hullRef.current;
+    let bezierPoints = [];
+    let elipsePoints = [];
+
+    for (let i = 0; i < hull.length; i++) {
+      let pointsPair = generateBezierPoints(hull[(i-1+hull.length) % hull.length], hull[i], hull[(i+1) % hull.length]);
+      bezierPoints.push(pointsPair);
+    }
+    bezierPointsRef.current = bezierPoints;
+
+    for (let i = 0; i < hull.length; i++) {
+      let elipse = generateBezierElipse(hull[i], bezierPoints[i].p2, 
+                      bezierPoints[(i+1) % hull.length].p1, hull[(i+1) % hull.length]);
+      elipsePoints.push(elipse);
+    }
+    elipsePointsRef.current = elipsePoints;
+  }
+
+  const generateBezierPoints = (a, b, c) => {
+    let v1 = normalizeVector({ x: b.x - a.x, y: b.y - a.y});
+    let v2 = normalizeVector({ x: c.x - b.x, y: c.y - b.y});
+
+    let k = v1.x * v2.y - v1.y * v2.x;
+    if (k < 0) {
+      //the angle is greater than pi, invert outgoing, 
+      //ready to get interior bisector 
+      v2 = {x: -v2.x, y: -v2.y };
+    }
+    else {
+      //the angle is less than pi, invert incoming, 
+      v1 = {x: -v1.x, y: -v1.y };
+    }
+
+    let bisector = normalizeVector({ x: v1.x + v2.x, y : v1.y + v2.y });
+    bisector = { x: -bisector.y, y: bisector.x }
+
+    // Check distances and reorder, so that p1 is close to a, and p2 close to b
+    let da = distance(a, b);
+    let da_part = da * bezierSize;
+
+    let dc = distance(c, b);
+    let dc_part = dc * bezierSize;
+
+    let p1 = null;
+    let p2 = null;
+
+    if (da > distance(a, {x: b.x + bisector.x, y: b.y + bisector.y })){
+      p1 = {x: b.x + bisector.x * da_part, y: b.y + bisector.y * da_part};
+      p2 = {x: b.x - bisector.x * dc_part, y: b.y - bisector.y * dc_part};
+    }
+    else {
+      p1 = {x: b.x - bisector.x * da_part, y: b.y - bisector.y * da_part};
+      p2 = {x: b.x + bisector.x * dc_part, y: b.y + bisector.y * dc_part};
+    }
+
+    return { p1: p1, p2: p2 }; 
+  }
+
+  // Generate points for bezier elypse given 4 points
+  const generateBezierElipse = (a, b, c, d) => {
+    let elipse = [];
+
+    for (let i = 0; i < elipsePoints; i++) {
+      let t = i / elipsePoints;
+      let x = (a.x * (1 - t)**3) + (3 * b.x * t * (1 - t)**2) + (3 * c.x * t**2 * (1 - t)) + (d.x * t**3);
+      let y = (a.y * (1 - t)**3) + (3 * b.y * t * (1 - t)**2) + (3 * c.y * t**2 * (1 - t)) + (d.y * t**3);
+      elipse.push({x: x, y: y});
+    }    
+    elipse.push(elipse[elipse.length-1]);
+    return elipse;
+  }
+
+  const distance = (a, b) => {
+    return Math.sqrt((a.x - b.x)**2 + (a.y - b.y)**2)
+  }
+
+  const normalizeVector = (vector) => {
+    let magnitiude = Math.sqrt(vector.x**2 + vector.y**2);
+    return { x: vector.x / magnitiude, y: vector.y / magnitiude };
   }
 
   // Calculate areas of rectangle using min-max points after rotating to edge
@@ -163,6 +268,7 @@ function App() {
     geneticBoundingBoxesDisplay = new Array(geneticCount).fill(false);
   }
 
+  // perform crossing between pair, results in mean of angles between them
   const crossRandomPair = (population) => {
     let a = Math.floor(Math.random() * population.length);
     let b = a;
@@ -281,6 +387,11 @@ function App() {
     redraw();
   }
 
+  const setBezierDisplay = (isOn) => {
+    displayBezier = isOn;
+    redraw();
+  }
+
   const setEdgesBoundingBoxesChecked = (index, isOn) => {
     edgesBoundingBoxesDisplay[index] = isOn;
     redraw();
@@ -305,6 +416,8 @@ function App() {
                   onChange={(e) => setPolygonDisplay(e.target.checked) } />
             <FormControlLabel control={<Checkbox defaultChecked />} label="Powłoka wypukła" 
                   onChange={(e) => setConvexHullDisplay(e.target.checked) } />
+            <FormControlLabel control={<Checkbox defaultChecked />} label="Krzywe Beziera" 
+                  onChange={(e) => setBezierDisplay(e.target.checked) } />
 
             <Button variant="contained" onClick={() => { areaFromEdges()}}>Pole za pomocą krawędzi</Button>
             {edgesBoundingBoxes.map((item, index) => (
