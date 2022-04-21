@@ -20,6 +20,11 @@ function App() {
   const [edgesBoundingBoxes, setEdgesBoundingBoxes] = useState([]);
   var edgesBoundingBoxesDisplay = [];
 
+  var geneticCount = 6;
+  var geneticIters = 100;
+  var geneticBoundingBoxesDisplay = [];
+  const [geneticBoundingBoxes, setGeneticBoundingBoxes] = useState([]);
+
   // initialize the canvas context
   useEffect(() => {
     // dynamically assign the width and height to canvas
@@ -74,6 +79,14 @@ function App() {
         drawPolygon(rectangle, 'brown');
       }
     }
+
+    for (let i = 0; i < geneticBoundingBoxes.length; i++) {
+      if (geneticBoundingBoxesDisplay[i]) {
+        let rectangle = boundingBoxToRectangle(geneticBoundingBoxes[i]);
+        rectangle = rotatePolygon(rectangle, -geneticBoundingBoxes[i].angle);
+        drawPolygon(rectangle, 'red');
+      }
+    }
   }
 
   // Calculate areas of rectangle using min-max points after rotating to edge
@@ -101,6 +114,64 @@ function App() {
 
     hull.pop();
     setEdgesBoundingBoxes(boundingBoxes);
+  }
+
+  // Calculate areas of rectangle using genetic algortithm
+  const areaGeneticAlgorithm = () => {
+    let hull = hullRef.current;
+    let population = [];
+
+    // Initialize with random angles from 0 to 90 degrees
+    for (let i = 0; i < geneticCount; i++) {
+      let angle = Math.random() * Math.PI / 2;
+      let rotated = rotatePolygon(hull, angle);
+      let boundingBoxArea = getBoundingBoxAndArea(rotated);
+      boundingBoxArea.angle = angle;
+
+      population.push(boundingBoxArea);
+    }
+
+    for (let i = 0; i < geneticIters; i++) {
+      population.sort((a, b) => a.area - b.area);
+      population = population.slice(0, Math.floor(geneticCount / 2));
+
+      // Crossing
+      let newPopulation = [];
+      for (let j = 0; j < Math.ceil(geneticCount / 2); j++) {
+        newPopulation.push(crossRandomPair(population));
+      }
+      population = population.concat(newPopulation);
+
+      // Mutation by max 1 degree
+      for (let j = 0; j < geneticCount; j++) {
+        population[j].angle += Math.random() / 360 * 2 * Math.PI;
+        population[j].angle = Math.min(Math.max(population[j].angle, 0), Math.PI / 2);
+      }
+
+      // Update values
+      for (let j = 0; j < geneticCount; j++) {
+        let rotated = rotatePolygon(hull, population[j].angle);
+        let boundingBoxArea = getBoundingBoxAndArea(rotated);
+        boundingBoxArea.angle = population[j].angle;
+        population[j] = boundingBoxArea; 
+      }
+    }
+
+    population.sort((a, b) => a.area - b.area);
+    setGeneticBoundingBoxes(population);
+
+    geneticBoundingBoxesDisplay = new Array(geneticCount).fill(false);
+  }
+
+  const crossRandomPair = (population) => {
+    let a = Math.floor(Math.random() * population.length);
+    let b = a;
+
+    while (b == a) {
+      b = Math.floor(Math.random() * population.length);
+    }
+
+    return {angle: Math.min(Math.max((population[a].angle + population[b].angle) / 2, 0), Math.PI / 2)}
   }
 
   // Rotate polygon by angle around center of canvas
@@ -196,6 +267,10 @@ function App() {
     generatePolygonAndHull();
   }
 
+  const setGeneticCount = (val) => {
+    geneticCount = val;
+  }
+
   const setPolygonDisplay = (isOn) => {
     displayPolygon = isOn;
     redraw();
@@ -208,6 +283,11 @@ function App() {
 
   const setEdgesBoundingBoxesChecked = (index, isOn) => {
     edgesBoundingBoxesDisplay[index] = isOn;
+    redraw();
+  }
+
+  const setGeneticBoundingBoxesChecked = (index, isOn) => {
+    geneticBoundingBoxesDisplay[index] = isOn;
     redraw();
   }
 
@@ -228,8 +308,19 @@ function App() {
 
             <Button variant="contained" onClick={() => { areaFromEdges()}}>Pole za pomocą krawędzi</Button>
             {edgesBoundingBoxes.map((item, index) => (
-                <FormControlLabel control={<Checkbox />} label={item.area} key={"edgeChecbox" + index}
+                <FormControlLabel control={<Checkbox />} label={item.area} key={"edgeCheckbox" + index}
                 onChange={(e) => setEdgesBoundingBoxesChecked(index, e.target.checked) } />
+            ))}
+
+            <Button variant="contained" onClick={() => { areaGeneticAlgorithm()}}>Pole za algorytmu genetycznego</Button>
+            <Typography id="input-genetic-count" gutterBottom>
+              Populacja algorytmu
+            </Typography>
+            <Slider defaultValue={6} min={6} max={15} valueLabelDisplay="on" aria-labelledby='input-genetic-count'
+               onChange={(e, val) => setGeneticCount(val) } />
+            {geneticBoundingBoxes.map((item, index) => (
+                <FormControlLabel control={<Checkbox />} label={item.area} key={"geneticCheckbox" + index}
+                onChange={(e) => setGeneticBoundingBoxesChecked(index, e.target.checked) } />
             ))}
         </div>
 
