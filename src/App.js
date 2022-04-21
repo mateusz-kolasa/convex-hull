@@ -1,9 +1,10 @@
 import './App.css';
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import Slider from '@mui/material/Slider';
 import Typography from '@mui/material/Typography';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import Button from '@mui/material/Button';
 
 function App() {
   const canvas = useRef();
@@ -13,8 +14,11 @@ function App() {
   var displayPolygon = true;
   var displayConvexHull = true;
 
-  var points = [];
-  var hull = [];
+  const points = useRef([]);
+  const hullRef = useRef([]);
+
+  const [edgesBoundingBoxes, setEdgesBoundingBoxes] = useState([]);
+  var edgesBoundingBoxesDisplay = [];
 
   // initialize the canvas context
   useEffect(() => {
@@ -30,21 +34,19 @@ function App() {
   }, []);
 
   const generatePolygonAndHull = () => {
-    points = []
+    points.current = []
     for (let i = 0; i < pointCount; i++) {
       var rand = getRandomPoint();
-      points.push(rand);
-      // drawCircle({ x: rand.x, y: rand.y });
+      points.current.push(rand);
     }
-
-    points.sort((a, b) => getAngle(a) - getAngle(b));
+    points.current.sort((a, b) => getAngle(a) - getAngle(b));
 
     var ch = require('convex-hull');
-    var hullIndexes = ch(points.map(point => [point.x, point.y]));
+    var hullIndexes = ch(points.current.map(point => [point.x, point.y]));
 
-    hull = [];
+    hullRef.current = [];
     for (let i = 0; i < hullIndexes.length; i++) {
-      hull.push(points[hullIndexes[i][0]]);
+      hullRef.current.push(points.current[hullIndexes[i][0]]);
     }
 
     redraw();
@@ -52,19 +54,95 @@ function App() {
 
   // Clear rect and draw polygon and it's convex hull
   const redraw = () => {
+    context = canvas.current.getContext("2d");
     context.clearRect(0, 0, canvas.current.width, canvas.current.height);
 
-    for (let i = 0; i < points.length; i++) {
-      drawCircle(points[i]);
+    for (let i = 0; i < points.current.length; i++) {
+      drawCircle(points.current[i]);
     }
 
-    console.log(points.length)
-
     if (displayPolygon)
-      drawPolygon(points, 'blue')
+      drawPolygon(points.current, 'blue')
 
     if (displayConvexHull)
-      drawPolygon(hull, 'green');
+      drawPolygon(hullRef.current, 'green');
+
+    for (let i = 0; i < edgesBoundingBoxes.length; i++) {
+      if (edgesBoundingBoxesDisplay[i]) {
+        let rectangle = boundingBoxToRectangle(edgesBoundingBoxes[i]);
+        rectangle = rotatePolygon(rectangle, edgesBoundingBoxes[i].angle);
+        drawPolygon(rectangle, 'brown');
+      }
+    }
+  }
+
+  // Calculate areas of rectangle using min-max points after rotating to edge
+  const areaFromEdges = () => {
+    let hull = hullRef.current;
+    redraw();
+    
+    let boundingBoxes = [];
+    hull.push(hull[0]);
+    for (let i = 0; i < hull.length - 1; i++) {
+
+      // Calculate angle between line and x axis
+      let xr = hull[i].x - hull[i + 1].x;
+      let yr = hull[i].y - hull[i + 1].y;
+      let angle = Math.atan2(yr, xr);
+      
+      // rotate polygon in opoosite direction and find it's bounding box
+      let rotated = rotatePolygon(hull, -angle);
+      let boundingBoxArea = getBoundingBoxAndArea(rotated);
+      boundingBoxArea.angle = angle;
+      boundingBoxes.push(boundingBoxArea);
+    }
+    boundingBoxes.sort((a, b) => a.area - b.area);
+    edgesBoundingBoxesDisplay = new Array(boundingBoxes.length).fill(false);
+
+    hull.pop();
+    setEdgesBoundingBoxes(boundingBoxes);
+  }
+
+  // Rotate polygon by angle around center of canvas
+  const rotatePolygon = (polygon, angle) => {
+    let x_center = canvas.current.width / 2;
+    let y_center = canvas.current.height / 2;
+    let rotated_polygon = [];
+
+    for (let i = 0; i < polygon.length; i++) {
+      let x = polygon[i].x - x_center; 
+      let y = polygon[i].y - y_center;
+
+      let xRotated = (x * Math.cos(angle)) - (y * Math.sin(angle)) + x_center;
+      let yRotated = (x * Math.sin(angle)) + (y * Math.cos(angle)) + y_center;
+
+      rotated_polygon.push({x: xRotated, y: yRotated});
+    }
+
+    return rotated_polygon;
+  }
+
+  // Find bounding box of polygon and calculate area
+  const getBoundingBoxAndArea = (polygon) => {
+    let polygon_x = polygon.map((vertex) => vertex.x);
+    let polygon_y = polygon.map((vertex) => vertex.y);
+
+    let xmin = Math.min(...polygon_x);
+    let ymin = Math.min(...polygon_y);
+    let xmax = Math.max(...polygon_x);
+    let ymax = Math.max(...polygon_y);
+
+    return {xmin: xmin, ymin: ymin, xmax: xmax, ymax: ymax, area: (xmax-xmin)*(ymax-ymin)};
+  }
+
+  // convert bounding box to point list
+  const boundingBoxToRectangle = (boundingBox) => {
+    let rectangle = [];
+    rectangle.push({x: boundingBox.xmin, y: boundingBox.ymin});
+    rectangle.push({x: boundingBox.xmax, y: boundingBox.ymin});
+    rectangle.push({x: boundingBox.xmax, y: boundingBox.ymax});
+    rectangle.push({x: boundingBox.xmin, y: boundingBox.ymax});
+    return rectangle;
   }
 
   const drawLine = (info, style = {}) => {
@@ -101,10 +179,12 @@ function App() {
     return Math.atan2(canvas.current.height / 2 - point.y, canvas.current.width / 2 - point.x);
   }
 
-  // Generates random point within canvas
+  // Generates random point within canvas minus padding 
   const getRandomPoint = () => {
-    var x = Math.random() * canvas.current.width;
-    var y = Math.random() * canvas.current.height;
+    let padding = 0.1;
+
+    var x = Math.random() * (canvas.current.width * (1 - 2 * padding)) + (canvas.current.width * padding);
+    var y = Math.random() * (canvas.current.height * (1 - 2 * padding)) + (canvas.current.height * padding);
     return { x: x, y: y };
   }
 
@@ -126,6 +206,11 @@ function App() {
     redraw();
   }
 
+  const setEdgesBoundingBoxesChecked = (index, isOn) => {
+    edgesBoundingBoxesDisplay[index] = isOn;
+    redraw();
+  }
+
   return (
     <div className="App">
       <div className='split-panel'>
@@ -140,6 +225,12 @@ function App() {
                   onChange={(e) => setPolygonDisplay(e.target.checked) } />
             <FormControlLabel control={<Checkbox defaultChecked />} label="Powłoka wypukła" 
                   onChange={(e) => setConvexHullDisplay(e.target.checked) } />
+
+            <Button variant="contained" onClick={() => { areaFromEdges()}}>Pole za pomocą krawędzi</Button>
+            {edgesBoundingBoxes.map((item, index) => (
+                <FormControlLabel control={<Checkbox />} label={item.area} key={"edgeChecbox" + index}
+                onChange={(e) => setEdgesBoundingBoxesChecked(index, e.target.checked) } />
+            ))}
         </div>
 
         <div className='canvas-panel'>
