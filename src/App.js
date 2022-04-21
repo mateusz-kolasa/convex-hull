@@ -106,7 +106,7 @@ function App() {
       let elipsePoints = elipsePointsRef.current;
 
       for (let i = 0; i < elipsePoints.length; i++) {
-        drawPolygon(elipsePoints[i], 'gray');
+        drawPolygon(elipsePoints[i], 'gray', true);
       }
     }
   }
@@ -181,7 +181,6 @@ function App() {
       let y = (a.y * (1 - t)**3) + (3 * b.y * t * (1 - t)**2) + (3 * c.y * t**2 * (1 - t)) + (d.y * t**3);
       elipse.push({x: x, y: y});
     }    
-    elipse.push(elipse[elipse.length-1]);
     return elipse;
   }
 
@@ -344,11 +343,13 @@ function App() {
     context.fill();
   };
 
-  const drawPolygon = (points, color) => {
+  const drawPolygon = (points, color, open = false) => {
     for (let i = 0; i < points.length - 1; i++) {
       drawLine({ x: points[i].x, y: points[i].y, x1: points[i+1].x, y1: points[i+1].y }, { color: color });
     }
-    drawLine({ x: points[points.length-1].x, y: points[points.length-1].y, x1: points[0].x, y1: points[0].y }, { color: color });
+
+    if (!open)
+      drawLine({ x: points[points.length-1].x, y: points[points.length-1].y, x1: points[0].x, y1: points[0].y }, { color: color });
   }
 
   // Get angle relative to center of canvas
