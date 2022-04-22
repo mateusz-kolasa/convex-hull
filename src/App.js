@@ -26,8 +26,9 @@ function App() {
   const [edgesBoundingBoxes, setEdgesBoundingBoxes] = useState([]);
   var edgesBoundingBoxesDisplay = [];
 
-  var geneticCount = 6;
-  var geneticIters = 100;
+  var geneticCount = useRef([6]);
+  var geneticIters = useRef([100]);
+  var mutationMax = useRef([1]);
   var geneticBoundingBoxesDisplay = [];
   const [geneticBoundingBoxes, setGeneticBoundingBoxes] = useState([]);
 
@@ -226,7 +227,7 @@ function App() {
     let population = [];
 
     // Initialize with random angles from 0 to 90 degrees
-    for (let i = 0; i < geneticCount; i++) {
+    for (let i = 0; i < geneticCount.current; i++) {
       let angle = Math.random() * Math.PI / 2;
       let rotated = rotatePolygon(hull, angle);
       let boundingBoxArea = getBoundingBoxAndArea(rotated);
@@ -235,25 +236,25 @@ function App() {
       population.push(boundingBoxArea);
     }
 
-    for (let i = 0; i < geneticIters; i++) {
+    for (let i = 0; i < geneticIters.current; i++) {
       population.sort((a, b) => a.area - b.area);
-      population = population.slice(0, Math.floor(geneticCount / 2));
+      population = population.slice(0, Math.floor(geneticCount.current / 2));
 
       // Crossing
       let newPopulation = [];
-      for (let j = 0; j < Math.ceil(geneticCount / 2); j++) {
+      for (let j = 0; j < Math.ceil(geneticCount.current / 2); j++) {
         newPopulation.push(crossRandomPair(population));
       }
       population = population.concat(newPopulation);
 
       // Mutation by max 1 degree
-      for (let j = 0; j < geneticCount; j++) {
-        population[j].angle += Math.random() / 360 * 2 * Math.PI;
+      for (let j = 0; j < geneticCount.current; j++) {
+        population[j].angle += mutationMax.current * ((Math.random() - 0.5) * 2) / 360 * 2 * Math.PI;
         population[j].angle = Math.min(Math.max(population[j].angle, 0), Math.PI / 2);
       }
 
       // Update values
-      for (let j = 0; j < geneticCount; j++) {
+      for (let j = 0; j < geneticCount.current; j++) {
         let rotated = rotatePolygon(hull, population[j].angle);
         let boundingBoxArea = getBoundingBoxAndArea(rotated);
         boundingBoxArea.angle = population[j].angle;
@@ -264,7 +265,7 @@ function App() {
     population.sort((a, b) => a.area - b.area);
     setGeneticBoundingBoxes(population);
 
-    geneticBoundingBoxesDisplay = new Array(geneticCount).fill(false);
+    geneticBoundingBoxesDisplay = new Array(geneticCount.current).fill(false);
   }
 
   // perform crossing between pair, results in mean of angles between them
@@ -375,7 +376,15 @@ function App() {
   }
 
   const setGeneticCount = (val) => {
-    geneticCount = val;
+    geneticCount.current = val;
+  }
+
+  const setGeneticIters = (val) => {
+    geneticIters.current = val;
+  }
+
+  const setGeneticMutation = (val) => {
+    mutationMax.current = val;
   }
 
   const setPolygonDisplay = (isOn) => {
@@ -410,7 +419,7 @@ function App() {
           <Typography id="input-points-count" gutterBottom>
             Liczba punktów
           </Typography>
-          <Slider defaultValue={10} min={5} max={25} valueLabelDisplay="on" aria-labelledby='input-points-count'
+          <Slider defaultValue={10} min={5} max={25} step={1} valueLabelDisplay="on" aria-labelledby='input-points-count'
                onChange={(e, val) => setPointCount(val) } />
 
             <FormControlLabel control={<Checkbox defaultChecked />} label="Figura" 
@@ -432,6 +441,19 @@ function App() {
             </Typography>
             <Slider defaultValue={6} min={6} max={15} valueLabelDisplay="on" aria-labelledby='input-genetic-count'
                onChange={(e, val) => setGeneticCount(val) } />
+
+            <Typography id="input-genetic-count" gutterBottom>
+              Liczba iteracji
+            </Typography>
+            <Slider defaultValue={100} min={50} max={500} step={1} valueLabelDisplay="on" aria-labelledby='input-genetic-iters'
+               onChange={(e, val) => setGeneticIters(val) } />
+
+            <Typography id="input-genetic-count" gutterBottom>
+              Maksymalna mutacja w stopniach
+            </Typography>      
+            <Slider defaultValue={1} min={0.5} max={15} step={0.1} valueLabelDisplay="on" aria-labelledby='input-genetic-mutation'
+               onChange={(e, val) => setGeneticMutation(val) } />
+
             {geneticBoundingBoxes.map((item, index) => (
                 <FormControlLabel control={<Checkbox />} label={item.area} key={"geneticCheckbox" + index}
                 onChange={(e) => setGeneticBoundingBoxesChecked(index, e.target.checked) } />
