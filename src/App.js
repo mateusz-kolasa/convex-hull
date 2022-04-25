@@ -10,30 +10,30 @@ function App() {
   const canvas = useRef();
   let context = null;
 
-  var pointCount = 10;
-  var displayPolygon = true;
-  var displayConvexHull = true;
-  var displayBezier = true;
+  var pointCountRef = useRef(10);
+  var displayPolygonRef = useRef(true);
+  var displayConvexHullRef = useRef(true);
+  var displayBezierRef = useRef(true);
 
   var bezierSize = 0.1;
   var elipsePoints = 100;
   const bezierPointsRef = useRef([]);
   const elipsePointsRef = useRef([]);
 
-  const points = useRef([]);
+  const pointsRef = useRef([]);
   const hullRef = useRef([]);
 
   const [edgesBoundingBoxes, setEdgesBoundingBoxes] = useState([]);
   var edgesBoundingBoxesDisplay = [];
 
-  var geneticCount = useRef([10]);
-  var geneticIters = useRef([100]);
-  var mutationMax = useRef([1]);
+  var geneticCountRef = useRef([10]);
+  var geneticItersRef = useRef([100]);
+  var mutationMaxRef = useRef([1]);
   var geneticBoundingBoxesDisplay = [];
   const [geneticBoundingBoxes, setGeneticBoundingBoxes] = useState([]);
 
   var geneticBoundingBoxBestDisplay = false;
-  var geneticBest = useRef(null);
+  var geneticBestRef = useRef(null);
 
   // initialize the canvas context
   useEffect(() => {
@@ -49,20 +49,24 @@ function App() {
   }, []);
 
   const generatePolygonAndHull = () => {
-    points.current = []
+    let pointCount = pointCountRef.current;
+    let points = [];
+
     for (let i = 0; i < pointCount; i++) {
       var rand = getRandomPoint();
-      points.current.push(rand);
+      points.push(rand);
     }
-    points.current.sort((a, b) => getAngle(a) - getAngle(b));
+    points.sort((a, b) => getAngle(a) - getAngle(b));
+    pointsRef.current = points;
 
     var ch = require('convex-hull');
-    var hullIndexes = ch(points.current.map(point => [point.x, point.y]));
+    var hullIndexes = ch(points.map(point => [point.x, point.y]));
 
-    hullRef.current = [];
+    let hull = [];
     for (let i = 0; i < hullIndexes.length; i++) {
-      hullRef.current.push(points.current[hullIndexes[i][0]]);
+      hull.push(points[hullIndexes[i][0]]);
     }
+    hullRef.current = hull;
 
     clearCalculated();
     generateBezier();
@@ -70,7 +74,7 @@ function App() {
   }
 
   const clearCalculated = () => {
-    geneticBest.current = null;
+    geneticBestRef.current = null;
     setEdgesBoundingBoxes([]);
     setGeneticBoundingBoxes([]);
   }
@@ -79,16 +83,19 @@ function App() {
   const redraw = () => {
     context = canvas.current.getContext("2d");
     context.clearRect(0, 0, canvas.current.width, canvas.current.height);
+    
+    let points = pointsRef.current;
+    let hull = hullRef.current;
 
-    for (let i = 0; i < points.current.length; i++) {
-      drawCircle(points.current[i]);
+    for (let i = 0; i < points.length; i++) {
+      drawCircle(points[i]);
     }
 
-    if (displayPolygon)
-      drawPolygon(points.current, 'blue')
+    if (displayPolygonRef.current)
+      drawPolygon(points, 'blue');
 
-    if (displayConvexHull)
-      drawPolygon(hullRef.current, 'green');
+    if (displayConvexHullRef.current)
+      drawPolygon(hull, 'green');
 
     for (let i = 0; i < edgesBoundingBoxes.length; i++) {
       if (edgesBoundingBoxesDisplay[i]) {
@@ -107,12 +114,13 @@ function App() {
     }
 
     if (geneticBoundingBoxBestDisplay) {
-      let rectangle = boundingBoxToRectangle(geneticBest.current);
-      rectangle = rotatePolygon(rectangle, -geneticBest.current.angle);
+      let geneticBest = geneticBestRef.current;
+      let rectangle = boundingBoxToRectangle(geneticBest);
+      rectangle = rotatePolygon(rectangle, -geneticBest.angle);
       drawPolygon(rectangle, 'red');
     }
 
-    if (displayBezier) {
+    if (displayBezierRef.current) {
       let bezierPoints = bezierPointsRef.current;
       for (let i = 0; i < bezierPoints.length; i++) {
         drawCircle(bezierPoints[i].p1, {color: 'red', size: 3});
@@ -120,7 +128,6 @@ function App() {
       }
 
       let elipsePoints = elipsePointsRef.current;
-
       for (let i = 0; i < elipsePoints.length; i++) {
         drawPolygon(elipsePoints[i], 'gray', true);
       }
@@ -242,7 +249,7 @@ function App() {
     let population = [];
 
     // Initialize with random angles from 0 to 90 degrees
-    for (let i = 0; i < geneticCount.current; i++) {
+    for (let i = 0; i < geneticCountRef.current; i++) {
       let angle = Math.random() * Math.PI / 2;
       let rotated = rotatePolygon(hull, angle);
       let boundingBoxArea = getBoundingBoxAndArea(rotated);
@@ -251,26 +258,26 @@ function App() {
       population.push(boundingBoxArea);
     }
     population.sort((a, b) => a.area - b.area);
-    geneticBest.current = population[0];
+    geneticBestRef.current = {...population[0]};
 
-    for (let i = 0; i < geneticIters.current; i++) {
-      population = population.slice(0, Math.floor(geneticCount.current / 2));
+    for (let i = 0; i < geneticItersRef.current; i++) {
+      population = population.slice(0, Math.floor(geneticCountRef.current / 2));
 
       // Crossing
       let newPopulation = [];
-      for (let j = 0; j < Math.ceil(geneticCount.current / 2); j++) {
+      for (let j = 0; j < Math.ceil(geneticCountRef.current / 2); j++) {
         newPopulation.push(crossRandomPair(population));
       }
       population = population.concat(newPopulation);
 
       // Mutation by random from max set degree
-      for (let j = 0; j < geneticCount.current; j++) {
-        population[j].angle += mutationMax.current * ((Math.random() - 0.5) * 2) / 360 * 2 * Math.PI;
+      for (let j = 0; j < geneticCountRef.current; j++) {
+        population[j].angle += mutationMaxRef.current * ((Math.random() - 0.5) * 2) / 360 * 2 * Math.PI;
         population[j].angle = (population[j].angle + (Math.PI / 2)) % (Math.PI / 2)
       }
 
       // Update values
-      for (let j = 0; j < geneticCount.current; j++) {
+      for (let j = 0; j < geneticCountRef.current; j++) {
         let rotated = rotatePolygon(hull, population[j].angle);
         let boundingBoxArea = getBoundingBoxAndArea(rotated);
         boundingBoxArea.angle = population[j].angle;
@@ -278,14 +285,13 @@ function App() {
       }
 
       population.sort((a, b) => a.area - b.area);
-      if (population[0].area < geneticBest.current.area) {
-        geneticBest.current = population[0]
+      if (population[0].area < geneticBestRef.current.area) {
+        geneticBestRef.current = {...population[0]};
       }
     }
 
+    geneticBoundingBoxesDisplay = new Array(geneticCountRef.current).fill(false);
     setGeneticBoundingBoxes(population);
-
-    geneticBoundingBoxesDisplay = new Array(geneticCount.current).fill(false);
   }
 
   // perform crossing between pair, results in mean of angles between them
@@ -402,37 +408,37 @@ function App() {
   }
 
   const setPointCount = (val) => {
-    if (pointCount == val)
+    if (pointCountRef.current == val)
       return;
 
-    pointCount = val;
+    pointCountRef.current = val;
     generatePolygonAndHull();
   }
 
   const setGeneticCount = (val) => {
-    geneticCount.current = val;
+    geneticCountRef.current = val;
   }
 
   const setGeneticIters = (val) => {
-    geneticIters.current = val;
+    geneticItersRef.current = val;
   }
 
   const setGeneticMutation = (val) => {
-    mutationMax.current = val;
+    mutationMaxRef.current = val;
   }
 
   const setPolygonDisplay = (isOn) => {
-    displayPolygon = isOn;
+    displayPolygonRef.current = isOn;
     redraw();
   } 
 
   const setConvexHullDisplay = (isOn) => {
-    displayConvexHull = isOn;
+    displayConvexHullRef.current = isOn;
     redraw();
   }
 
   const setBezierDisplay = (isOn) => {
-    displayBezier = isOn;
+    displayBezierRef.current = isOn;
     redraw();
   }
 
@@ -493,11 +499,11 @@ function App() {
             <Slider defaultValue={1} min={0.1} max={15} step={0.1} valueLabelDisplay="on" aria-labelledby='input-genetic-mutation'
                onChange={(e, val) => setGeneticMutation(val) } />
 
-            {geneticBest.current != null &&
+            {geneticBestRef.current != null &&
               <div>
                 <Typography variant="h6"> Najlepszy: </Typography>
-                <FormControlLabel control={<Checkbox />} label={geneticBest.current.area.toFixed(2) + " => " + 
-                (360 * geneticBest.current.angle / (2 * Math.PI)).toFixed(2) + '\u00b0'} key={"geneticCheckboxBest"}
+                <FormControlLabel control={<Checkbox />} label={geneticBestRef.current.area.toFixed(2) + " => " + 
+                (360 * geneticBestRef.current.angle / (2 * Math.PI)).toFixed(2) + '\u00b0'} key={"geneticCheckboxBest"}
                 onChange={(e) => setGeneticBoundingBoxBestChecked(e.target.checked) } />    
               </div>
             }
