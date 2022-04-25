@@ -32,6 +32,9 @@ function App() {
   var geneticBoundingBoxesDisplay = [];
   const [geneticBoundingBoxes, setGeneticBoundingBoxes] = useState([]);
 
+  var geneticBoundingBoxBestDisplay = false;
+  var geneticBest = useRef(null);
+
   // initialize the canvas context
   useEffect(() => {
     // dynamically assign the width and height to canvas
@@ -61,8 +64,15 @@ function App() {
       hullRef.current.push(points.current[hullIndexes[i][0]]);
     }
 
+    clearCalculated();
     generateBezier();
     redraw();
+  }
+
+  const clearCalculated = () => {
+    geneticBest.current = null;
+    setEdgesBoundingBoxes([]);
+    setGeneticBoundingBoxes([]);
   }
 
   // Clear rect and draw polygon and it's convex hull
@@ -96,6 +106,11 @@ function App() {
       }
     }
 
+    if (geneticBoundingBoxBestDisplay) {
+      let rectangle = boundingBoxToRectangle(geneticBest.current);
+      rectangle = rotatePolygon(rectangle, -geneticBest.current.angle);
+      drawPolygon(rectangle, 'red');
+    }
 
     if (displayBezier) {
       let bezierPoints = bezierPointsRef.current;
@@ -235,9 +250,10 @@ function App() {
 
       population.push(boundingBoxArea);
     }
+    population.sort((a, b) => a.area - b.area);
+    geneticBest.current = population[0];
 
     for (let i = 0; i < geneticIters.current; i++) {
-      population.sort((a, b) => a.area - b.area);
       population = population.slice(0, Math.floor(geneticCount.current / 2));
 
       // Crossing
@@ -260,9 +276,13 @@ function App() {
         boundingBoxArea.angle = population[j].angle;
         population[j] = boundingBoxArea; 
       }
+
+      population.sort((a, b) => a.area - b.area);
+      if (population[0].area < geneticBest.current.area) {
+        geneticBest.current = population[0]
+      }
     }
 
-    population.sort((a, b) => a.area - b.area);
     setGeneticBoundingBoxes(population);
 
     geneticBoundingBoxesDisplay = new Array(geneticCount.current).fill(false);
@@ -407,6 +427,11 @@ function App() {
     redraw();
   }
 
+  const setGeneticBoundingBoxBestChecked = (isOn) => {
+    geneticBoundingBoxBestDisplay = isOn;
+    redraw();
+  }
+
   const setGeneticBoundingBoxesChecked = (index, isOn) => {
     geneticBoundingBoxesDisplay[index] = isOn;
     redraw();
@@ -431,7 +456,7 @@ function App() {
 
             <Button variant="contained" onClick={() => { areaFromEdges()}}>Pole za pomocą krawędzi</Button>
             {edgesBoundingBoxes.map((item, index) => (
-                <FormControlLabel control={<Checkbox />} label={item.area} key={"edgeCheckbox" + index}
+                <FormControlLabel control={<Checkbox />} label={item.area.toFixed(2)} key={"edgeCheckbox" + index}
                 onChange={(e) => setEdgesBoundingBoxesChecked(index, e.target.checked) } />
             ))}
 
@@ -454,8 +479,21 @@ function App() {
             <Slider defaultValue={1} min={0.5} max={15} step={0.1} valueLabelDisplay="on" aria-labelledby='input-genetic-mutation'
                onChange={(e, val) => setGeneticMutation(val) } />
 
+            {geneticBest.current != null &&
+              <div>
+                <Typography variant="h6"> Najlepszy: </Typography>
+                <FormControlLabel control={<Checkbox />} label={geneticBest.current.area.toFixed(2) + " => " + 
+                (360 * geneticBest.current.angle / (2 * Math.PI)).toFixed(2) + '\u00b0'} key={"geneticCheckboxBest"}
+                onChange={(e) => setGeneticBoundingBoxBestChecked(e.target.checked) } />    
+              </div>
+            }
+
+            {geneticBoundingBoxes.length > 0 &&
+                <Typography variant="h6"> Ostatnie pokolenie: </Typography>
+            }
             {geneticBoundingBoxes.map((item, index) => (
-                <FormControlLabel control={<Checkbox />} label={item.area} key={"geneticCheckbox" + index}
+                <FormControlLabel control={<Checkbox />} label={item.area.toFixed(2) + " => " + 
+                (360 * item.angle / (2 * Math.PI)).toFixed(2) + '\u00b0'} key={"geneticCheckbox" + index}
                 onChange={(e) => setGeneticBoundingBoxesChecked(index, e.target.checked) } />
             ))}
         </div>
