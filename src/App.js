@@ -26,7 +26,7 @@ function App() {
   const [edgesBoundingBoxes, setEdgesBoundingBoxes] = useState([]);
   var edgesBoundingBoxesDisplay = [];
 
-  var geneticCount = useRef([6]);
+  var geneticCount = useRef([10]);
   var geneticIters = useRef([100]);
   var mutationMax = useRef([1]);
   var geneticBoundingBoxesDisplay = [];
@@ -263,10 +263,10 @@ function App() {
       }
       population = population.concat(newPopulation);
 
-      // Mutation by max 1 degree
+      // Mutation by random from max set degree
       for (let j = 0; j < geneticCount.current; j++) {
         population[j].angle += mutationMax.current * ((Math.random() - 0.5) * 2) / 360 * 2 * Math.PI;
-        population[j].angle = Math.min(Math.max(population[j].angle, 0), Math.PI / 2);
+        population[j].angle = (population[j].angle + (Math.PI / 2)) % (Math.PI / 2)
       }
 
       // Update values
@@ -290,6 +290,7 @@ function App() {
 
   // perform crossing between pair, results in mean of angles between them
   const crossRandomPair = (population) => {
+    let angleLimit = Math.PI / 2; // 90 degree max
     let a = Math.floor(Math.random() * population.length);
     let b = a;
 
@@ -297,7 +298,22 @@ function App() {
       b = Math.floor(Math.random() * population.length);
     }
 
-    return {angle: Math.min(Math.max((population[a].angle + population[b].angle) / 2, 0), Math.PI / 2)}
+    let angle = 0;
+    if (Math.abs(population[a].angle - population[b].angle) <= (angleLimit / 2)) { // Find angle point halfway between a and b
+      angle = (population[a].angle + population[b].angle) / 2;
+      console.log('x');
+    }
+    else { // if they are further away than half of max find closer point from other side
+      let minAngle = Math.min(population[a].angle, population[b].angle)
+      let maxAngle = Math.max(population[a].angle, population[b].angle)
+      
+      angle = (maxAngle + ((minAngle + angleLimit - maxAngle) / 2)) % angleLimit;
+      let toDeg = 360 / (2 * Math.PI);
+      console.log("A: " + population[a].angle * toDeg + " , B: ", population[b].angle * toDeg + " , Middle: " + angle * toDeg); 
+    }
+
+
+    return {angle: angle}
   }
 
   // Rotate polygon by angle around center of canvas
@@ -464,7 +480,7 @@ function App() {
             <Typography id="input-genetic-count" gutterBottom>
               Populacja algorytmu
             </Typography>
-            <Slider defaultValue={6} min={6} max={15} valueLabelDisplay="on" aria-labelledby='input-genetic-count'
+            <Slider defaultValue={10} min={10} max={100} valueLabelDisplay="on" aria-labelledby='input-genetic-count'
                onChange={(e, val) => setGeneticCount(val) } />
 
             <Typography id="input-genetic-count" gutterBottom>
@@ -476,7 +492,7 @@ function App() {
             <Typography id="input-genetic-count" gutterBottom>
               Maksymalna mutacja w stopniach
             </Typography>      
-            <Slider defaultValue={1} min={0.5} max={15} step={0.1} valueLabelDisplay="on" aria-labelledby='input-genetic-mutation'
+            <Slider defaultValue={1} min={0.1} max={15} step={0.1} valueLabelDisplay="on" aria-labelledby='input-genetic-mutation'
                onChange={(e, val) => setGeneticMutation(val) } />
 
             {geneticBest.current != null &&
