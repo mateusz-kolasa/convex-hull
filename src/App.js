@@ -301,7 +301,6 @@ function App() {
     let angle = 0;
     if (Math.abs(population[a].angle - population[b].angle) <= (angleLimit / 2)) { // Find angle point halfway between a and b
       angle = (population[a].angle + population[b].angle) / 2;
-      console.log('x');
     }
     else { // if they are further away than half of max find closer point from other side
       let minAngle = Math.min(population[a].angle, population[b].angle)
@@ -309,7 +308,6 @@ function App() {
       
       angle = (maxAngle + ((minAngle + angleLimit - maxAngle) / 2)) % angleLimit;
       let toDeg = 360 / (2 * Math.PI);
-      console.log("A: " + population[a].angle * toDeg + " , B: ", population[b].angle * toDeg + " , Middle: " + angle * toDeg); 
     }
 
 
